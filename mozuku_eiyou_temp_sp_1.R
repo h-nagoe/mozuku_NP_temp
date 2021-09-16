@@ -125,17 +125,18 @@ plot1
 
 ggsave("PO4.png",plot1)
 
-# NO3 ミカエリスメンテン阻害項あり  ----
+
+# NO3 ----
 # まずはプロット
 
-ggplot(dset)+
+ggplot(dset %>% filter(temp > 10))+
   geom_point(aes(x = temp,
                  y = NO3,
-                 color = strain))
+                 color = strain))+
+    facet_wrap("strain")
 
 dsetNO3 = dset %>% 
   filter(temp > 10) %>% select(temp,strain,NO3)
-
 
 # 阻害項あり 阻害項1個 ----
 
@@ -149,7 +150,7 @@ get_prior(mm_formula_2,
           data = dsetNO3,
           family = Gamma(link = "identity"))
 
-priors2 = c(prior(cauchy(0,4.2),class = shape),
+priors2 = c(prior(cauchy(0,2.5),class = shape),
            prior(student_t(3,0,4.2), nlpar = k1, lb = 0),
            prior(student_t(3,0,4.2), nlpar = k2, lb = 0),
            prior(student_t(3,0,4.2), nlpar = vmax, lb = 0))
@@ -203,7 +204,7 @@ ylabel2 = expression("Uptake rate of"~NO[3]-N)
 plot2 = ggplot() + 
   geom_point(aes(x = temp,
                  y = NO3),
-             data = dsetNO3)+
+             data = dsetNO3 %>% filter(strain != "KAT"))+
   geom_ribbon(aes(ymin = .lower,
                   ymax = .upper,
                   x = temp),
@@ -311,84 +312,91 @@ plot3
 
 ggsave("NO3_b.png",plot3)
 
-# # NH4 直線回帰
-# 
-# 
-# lm_formula = bf(NH4 ~ k1*temp + b,
-#                   nl = TRUE,
-#                   k1 ~ (1|strain),
-#                   b ~ (1|strain))
-# 
-# get_prior(lm_formula,
-#           data = dset,
-#           family = Gamma(link = "identity"))
-# 
-# priors2 = c(prior(cauchy(0,2.5),class = shape),
-#             prior(student_t(3,0,2.5), nlpar = k1, lb = 0),
-#             prior(student_t(3,0,2.5), nlpar = b, lb = 0))
-# 
-# # 仮当てはめ
-# mm_out_2 = brm(mm_formula_2,
-#                data = dset,
-#                family = Gamma(link = "identity"),prior = priors,
-#                chains = 5,cores = 5,iter = 10,seed = 2020,
-#                control = list(adapt_delta = 0.999,max_treedepth = 10))
-# 
-# mm_out_NO3 = 　update(mm_out_2,newdata = dset,
-#                      family = Gamma(link = "identity"),
-#                      prior = priors2,
-#                      chains = 5,cores = 5,iter = 10000,seed = 2020,
-#                      control = list(adapt_delta = 0.99999,max_treedepth = 11))
-# 
-# plot(mm_out_NO3)
-# 
-# xval2 = mm_out_NO3 %>% pluck("data") %>% pluck("temp")
-# yval2 = mm_out_NO3 %>% pluck("data") %>% pluck("NO3")
-# yrep2 = posterior_predict(mm_out_NO3)
-# 
-# ppc_dens_overlay(yval2,yrep2[1:100,])
-# ppc_error_scatter_avg_vs_x(yval2, yrep2, xval2)
-# 
-# # 期待値
-# edata2 = mm_out_NO3 %>%
-#   pluck("data") %>% 
-#   expand(temp = seq(min(temp),max(temp),by = 1),
-#          strain) %>% 
-#   add_linpred_draws(mm_out_NO3,n = 1000) %>% 
-#   group_by(strain,temp) %>% 
-#   mean_hdci()
-# 
-# # 予測値
-# pdata2 = mm_out_NO3 %>% 
-#   pluck("data") %>% 
-#   expand(temp = seq(min(temp),max(temp),by = 1),
-#          strain) %>% 
-#   add_predicted_draws(mm_out_NO3,n = 1000) %>% 
-#   group_by(temp,strain) %>% 
-#   mean_hdci()
-# 
-# # 作図
-# 
-# ylabel2 = expression("Uptake rate of"~NO[3]-N)
-# 
-# plot2 = ggplot() + 
-#   geom_point(aes(x = temp,
-#                  y = NO3),
-#              data = dset)+
-#   geom_ribbon(aes(ymin = .lower,
-#                   ymax = .upper,
-#                   x = temp),
-#               alpha = 0.2,
-#               data = pdata2)+
-#   geom_ribbon(aes(ymin = .lower,
-#                   ymax = .upper,
-#                   x = temp),
-#               alpha = 0.2,
-#               data = edata2)+
-#   geom_line(aes(x = temp,
-#                 y = .value),
-#             data = edata2)+
-#   facet_wrap("strain")+
-#   theme_pubr()
-# 
-# ggsave("NO3.png",plot2)
+# NH4 直線回帰 ----
+
+ggplot(dset,aes(x= temp,y = NH4,colour = strain))+
+  geom_point()+
+  facet_wrap("strain")
+
+
+
+lm_formula = bf(NH4 ~ k1*temp + b,
+                  nl = TRUE,
+                  k1 ~ (1|strain),
+                  b ~ (1|strain))
+
+get_prior(lm_formula,
+          data = dset,
+          family = Gamma(link = "identity"))
+
+priors2 = c(prior(cauchy(0,2.5),class = shape),
+            prior(student_t(3,0,5.4), nlpar = k1, lb = 0),
+            prior(student_t(3,0,5.4), nlpar = b, lb = 0))
+
+# 仮当てはめ
+mm_out_2 = brm(lm_formula,
+               data = dset,
+               family = Gamma(link = "identity"),prior = priors2,
+               chains = 5,cores = 5,iter = 10,seed = 2020,
+               control = list(adapt_delta = 0.999,max_treedepth = 10))
+
+mm_out_NO3 = 　update(mm_out_2,
+                     newdata = dset,
+                     family = Gamma(link = "identity"),
+                     prior = priors2,
+                     chains = 4,cores = 4,iter = 10000,
+                     warmup = 7000,seed = 2020,
+                     control = list(adapt_delta = 0.99999,max_treedepth = 12))
+
+plot(mm_out_NO3)
+
+xval2 = mm_out_NO3 %>% pluck("data") %>% pluck("temp")
+yval2 = mm_out_NO3 %>% pluck("data") %>% pluck("NO3")
+yrep2 = posterior_predict(mm_out_NO3)
+
+ppc_dens_overlay(yval2,yrep2[1:100,])
+ppc_error_scatter_avg_vs_x(yval2, yrep2, xval2)
+
+# 期待値
+edata2 = mm_out_NO3 %>%
+  pluck("data") %>%
+  expand(temp = seq(min(temp),max(temp),by = 1),
+         strain) %>%
+  add_linpred_draws(mm_out_NO3,n = 1000) %>%
+  group_by(strain,temp) %>%
+  mean_hdci()
+
+# 予測値
+pdata2 = mm_out_NO3 %>%
+  pluck("data") %>%
+  expand(temp = seq(min(temp),max(temp),by = 1),
+         strain) %>%
+  add_predicted_draws(mm_out_NO3,n = 1000) %>%
+  group_by(temp,strain) %>%
+  mean_hdci()
+
+# 作図
+
+ylabel2 = expression("Uptake rate of"~NO[3]-N)
+
+plot2 = ggplot() +
+  geom_point(aes(x = temp,
+                 y = NO3),
+             data = dset)+
+  geom_ribbon(aes(ymin = .lower,
+                  ymax = .upper,
+                  x = temp),
+              alpha = 0.2,
+              data = pdata2)+
+  geom_ribbon(aes(ymin = .lower,
+                  ymax = .upper,
+                  x = temp),
+              alpha = 0.2,
+              data = edata2)+
+  geom_line(aes(x = temp,
+                y = .value),
+            data = edata2)+
+  facet_wrap("strain")+
+  theme_pubr()
+
+ggsave("NO3.png",plot2)
