@@ -15,6 +15,10 @@ library(lemon)
 library(gridExtra)
 library(patchwork)
 
+# R.version
+# packageVersion("brms")
+
+
 rstan_options(auto_write=TRUE)
 options(mc.cores = parallel::detectCores())
 
@@ -139,7 +143,19 @@ pdataNH4 = mm_out_NH4 %>%
 pdata = rbind(pdataNO3,pdataNH4,pdataPO4) %>% 
   mutate(NP = factor(NP,levels = c("NO3","NH4","PO4")))
 
+# 期待値の最大値と最小値を算出 ----
+e1 = edata %>% group_by(NP,strain) %>% 
+  filter(.value == max(.value)) %>% 
+  select(NP,strain,temp,.value) %>%
+  mutate(evalue = "max")
 
+e2 = edata %>% group_by(NP,strain) %>% 
+  filter(.value == min(.value)) %>% 
+  select(NP,strain,temp,.value) %>%
+  mutate(evalue = "min")
+
+e_summarize = rbind(e1,e2)
+write.csv(e_summarize,file = "e_summarize.csv")
 
 # 作図
 xlabel = expression("Temperature" ~ ({}^degree*C ))
